@@ -118,7 +118,16 @@ public:
     if (Dim::msgLevel >= 1)
       IFEM::cout <<"\n  Solving the elasto-dynamics problem...";
 
-    if (dSim.solveStep(tp) != SIM::CONVERGED)
+    SIM::ConvStatus stat = dSim.solveStep(tp);
+    if (stat == SIM::DIVERGED) {
+      // Try cut-back with a smaller time step when diverging
+      if (!tp.cutback())
+        return false;
+
+      dSim.setSolution(dSim.getSolution(1),0);
+      this->updateConfiguration(dSim.getSolution(0));
+      return this->solveStep(tp);
+    } else if (stat != SIM::CONVERGED)
       return false;
 
     return this->postSolve(tp);
