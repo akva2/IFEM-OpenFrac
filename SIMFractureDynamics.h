@@ -94,11 +94,60 @@ public:
     hsol = this->S2.getHistoryField();
   }
 
+  bool staticInitialRefine(int nrefinements)
+  {
+#ifdef HAS_LRSPLINE
+    ASMu2D* pch = dynamic_cast<ASMu2D*>(this->S1.getPatch(1));
+    if (!pch)
+      return false;
+    for (int i = 0; i < nrefinements; ++i) {
+      LR::RefineData prm;
+      prm.options = { 10, 1, 2, 0, 1 };
+      for (LR::Basisfunction* b : pch->getSurface()->getAllBasisfunctions()) {
+        double cx = (b->getParmin(0) + b->getParmax(0))/2.0;
+        double cy = (b->getParmin(1) + b->getParmax(1))/2.0;
+
+        double pardist = sqrt(pow(cx-this->S2.getInitRefineParams()[0],2.0) +
+                              pow(cy-this->S2.getInitRefineParams()[1],2.0));
+        if (pardist < this->S2.getInitRefineRadius())
+          prm.elements.push_back(b->getId());
+      }
+
+      IFEM::cout <<"  Functions to refine: "<< prm.elements.size() << std::endl;
+      if (!this->S1.refine(prm) || !this->S2.refine(prm))
+        return false;
+    }
+
+    this->S1.clearProperties();
+    this->S2.clearProperties();
+    if (!this->S1.read(infile.c_str()) || !this->S2.read(infile.c_str()))
+      return false;
+
+    if (!this->preprocess())
+      return false;
+
+    if (!this->init(TimeStep()))
+      return false;
+
+    if (!this->S1.initSystem(this->S1.opt.solver) ||
+        !this->S2.initSystem(this->S2.opt.solver,1,1,false))
+      return false;
+
+    return true;
+#else
+    std::cerr <<" *** SIMFractureDynamics:adaptMesh: No LR-spline support.\n";
+    return false;
+#endif
+  }
+
   //! \brief Refines the mesh on the initial configuration.
   bool initialRefine(double beta, double min_frac, int nrefinements)
   {
     if (this->S2.getInitRefine() >= nrefinements)
       return true; // Grid is sufficiently refined during input parsing
+
+    if (this->S2.getInitRefineParams()[0] != 0.0)
+      return staticInitialRefine(nrefinements);
 
     TimeStep step0;
     int newElements = 1;

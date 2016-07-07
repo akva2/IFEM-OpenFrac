@@ -35,7 +35,7 @@ template<class Dim> class SIMPhaseField : public Dim
 {
 public:
   //! \brief Default constructor.
-  SIMPhaseField(Dim* gridOwner = nullptr) : Dim(1)
+  SIMPhaseField(Dim* gridOwner = nullptr) : Dim(1), irefu{0.0,0.0,0.0}, irefRad(0.01)
   {
     Dim::myHeading = "Cahn-Hilliard solver";
     if (gridOwner)
@@ -254,6 +254,12 @@ public:
   //! \brief Returns the number of initial refinement cycles.
   int getInitRefine() const { return irefine; }
 
+  //! \brief Get parameters of point to do initial refine around.
+  const std::array<double,3>& getInitRefineParams() const { return irefu; }
+
+  //! \brief Get radius around point to do initial refine around.
+  double getInitRefineRadius() const { return irefRad; }
+
   //! \brief Solves the linearized system of current iteration.
   //! \param[in] tp Time stepping parameters
   //!
@@ -333,6 +339,13 @@ protected:
             irefine = atoi(value);
           else if ((value = utl::getValue(child,"refine_limit")))
             refTol = atof(value);
+          if (!strcasecmp(child->Value(),"initial_refine_around")) {
+            utl::getAttribute(child, "u", irefu[0]);
+            utl::getAttribute(child, "v", irefu[1]);
+            utl::getAttribute(child, "w", irefu[2]);
+            utl::getAttribute(child, "radius", irefRad);
+          }
+
           Dim::myProblem->parse(child);
         }
       }
@@ -363,6 +376,8 @@ private:
   int    Lnorm;      //!< Which L-norm to use to guide mesh refinement
   int    irefine;    //!< Number of initial refinement cycles
   double refTol;     //!< Initial refinement threshold
+  std::array<double,3> irefu;   //!< Parameter values for point to perform initial refinement around.
+  double irefRad;    //!< Initial refine radius
 };
 
 #endif
