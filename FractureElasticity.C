@@ -20,6 +20,8 @@
 #include "Tensor4.h"
 #include "Tensor.h"
 #include "Profiler.h"
+#include "IFEM.h"
+#include "tinyxml.h"
 
 #ifndef epsZ
 //! \brief Zero tolerance for strains.
@@ -32,7 +34,7 @@ FractureElasticity::FractureElasticity (unsigned short int n)
 {
   alpha = 0.0;
   this->registerVector("phasefield",&myCVec);
-  eC = 1; // Assuming second vector is phase field 
+  eC = 1; // Assuming second vector is phase field
 }
 
 
@@ -51,6 +53,28 @@ void FractureElasticity::initIntegration (size_t nGp, size_t)
 {
   // Initialize internal tensile energy buffer
   myPhi.resize(nGp);
+}
+
+
+
+bool FractureElasticity::parse (const TiXmlElement* elem)
+{
+  const char* value = utl::getValue(elem,"stabilization");
+  if (value)
+    alpha = atof(value);
+  else
+    return this->Elasticity::parse(elem);
+
+  return true;
+}
+
+
+void FractureElasticity::printLog () const
+{
+  this->Elasticity::printLog();
+
+  if (alpha != 0.0)
+    IFEM::cout <<"\tStabilization parameter: "<< alpha << std::endl;
 }
 
 
@@ -237,12 +261,19 @@ bool FractureElasticity::evalStress (double lambda, double mu, double Gc,
 
 
 double FractureElasticity::getStressDegradation (const Vector& N,
-                                                 const Vectors& eV) const
+                                                 const Vectors& eV,
+                                                 char derivative) const
 {
+  if (derivative > 1)
+    return (1.0-alpha)*2.0; // return the (constant) 2nd derivative of g(c)
+
   // Evaluate the crack phase field function, c(X)
   double c = eV[eC].empty() ? 1.0 : N.dot(eV[eC]);
-  // Evaluate the stress degradation function, g(c), ignoring negative values
-  return c > 0.0 ? (1.0-alpha)*c*c + alpha : alpha;
+
+  if (derivative > 0) // Evaluate the 1st derivative of g(c)
+    return c > 0.0 ? (1.0-alpha)*c*2.0 : 0.0;
+  else // Evaluate g(c) itself, ignoring negative values
+    return c > 0.0 ? (1.0-alpha)*c*c + alpha : alpha;
 }
 
 

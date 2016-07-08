@@ -36,6 +36,12 @@ public:
   //! \brief Empty destructor.
   virtual ~FractureElasticity() {}
 
+  //! \brief Parses a data section from an XML element.
+  virtual bool parse(const TiXmlElement* elem);
+
+  //! \brief Prints out the problem definition to the log stream.
+  virtual void printLog() const;
+
   //! \brief Sets the number of solution variables per node.
   void setVar(unsigned short int n) { npv = n; }
 
@@ -46,11 +52,13 @@ public:
   //! \param[in] nGp Total number of interior integration points
   virtual void initIntegration(size_t nGp, size_t);
 
+  using Elasticity::initElement;
   //! \brief Initializes current element for numerical integration.
   //! \param[in] MNPC Matrix of nodal point correspondance for current element
   //! \param elmInt Local integral for element
   virtual bool initElement(const std::vector<int>& MNPC, LocalIntegral& elmInt);
 
+  using Elasticity::evalInt;
   //! \brief Evaluates the integrand at an interior point.
   //! \param elmInt The local integral object to receive the contributions
   //! \param[in] fe Finite element data of current integration point
@@ -105,14 +113,15 @@ protected:
                   bool postProc = false) const;
 
   //! \brief Evaluates the stress degradation function \a g(c) at current point.
-  double getStressDegradation(const Vector& N, const Vectors& eV) const;
+  double getStressDegradation(const Vector& N, const Vectors& eV,
+                              char derivative = 0) const;
 
 private:
-  unsigned short int eC; //!< Zero-based index to element phase field vector
+  double alpha;  //!< Relaxation factor for the crack phase field
+  Vector myCVec; //!< Crack phase field values at control (nodal) points
 
 protected:
-  double alpha;  //!< Relaxation factor for the crack phase field
-  Vector myCVec; //!< Crack phase field values at nodal points
+  unsigned short int eC; //!< Zero-based index to element phase field vector
 
   mutable RealArray myPhi; //!< Tensile energy density at integration points
   Vectors&          mySol; //!< Primary solution vectors for current patch
