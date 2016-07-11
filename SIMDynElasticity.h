@@ -208,14 +208,14 @@ public:
   //! \param[in] tp Time stepping parameters
   SIM::ConvStatus solveIteration(TimeStep& tp)
   {
-    if (quasiStatic())
-      return dSim.solveStep(tp);
-
-    return dSim.solveIteration(tp);
+    return subIt == 1 ? dSim.solveStep(tp) : dSim.solveIteration(tp);
   }
 
-  //! \brief Returns the maximum number of iterations.
-  int getMaxit() const { return dSim.getMaxit(); }
+  //! \brief Returns the maximum number of sub-iterations.
+  int getMaxit() const { return subIt == 2 ? dSim.getMaxit() : maxSubIt; }
+
+  //! \brief Returns sub-iteration tolerance.
+  double getSubitTolerance() const { return subItTol; }
 
 protected:
   //! \brief Returns the actual integrand.
@@ -238,6 +238,15 @@ protected:
       std::string form("voigt");
       if (utl::getAttribute(elem,"formulation",form,true) && form != "voigt")
         Dim::myProblem = new FractureElasticity(Dim::dimension);
+
+      const TiXmlElement* child = elem->FirstChildElement("subiterations");
+      if (child) {
+        utl::getAttribute(child,"type",subIt);
+        if (subIt < 0 && subIt > 2)
+          subIt = 0;
+        utl::getAttribute(child,"tol",subItTol);
+        utl::getAttribute(child,"max",maxSubIt);
+      }
       result = this->SIMElasticity<Dim>::parse(elem);
     }
     else
@@ -252,6 +261,12 @@ private:
   Matrix eNorm;   //!< Element norm values
   Vector gNorm;   //!< Global norm values
   int    vtfStep; //!< VTF file step counter
+
+  // 1 = Elasticity problem is solved before each phase field update
+  // 2 = Phase field updated after each linearization
+  int subIt = 1;          //!< Sub-iteration type to use
+  int maxSubIt = 100;     //!< Maximum number of sub-iterations
+  double subItTol = 1e-4; //!< Tolerance in sub-iterations
 };
 
 #endif
