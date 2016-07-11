@@ -29,7 +29,7 @@
 
 
 //! \brief A struct collecting the command-line argument values.
-struct FDargs
+struct FDargs : public XMLInputBase
 {
   //! Time integrator to use (0=linear quasi-static, no phase-field coupling,
   //! 1=linear Newmark, 2=linear generalized alpha, 3=nonlinear quasi-static,
@@ -42,6 +42,27 @@ struct FDargs
   //! \brief Default constructor.
   FDargs() : inpfile(nullptr)
   { coupling = integrator = 1; adaptive = false; }
+
+  virtual bool parse(const TiXmlElement* elem)
+  {
+    if (!strcasecmp(elem->Value(),"elasticity")) {
+      const TiXmlElement* child = elem->FirstChildElement();
+      for (; child; child= child->NextSiblingElement())
+        if (!strcasecmp(child->Value(),"subiterations")) {
+          int type = 0;
+          utl::getAttribute(child,"type",type);
+          if (type)
+            coupling = 2;
+        }
+    }
+
+    return true;
+  }
+
+  bool read(const char* inputFile)
+  {
+    return readXML(inputFile);
+  }
 };
 
 
@@ -298,8 +319,6 @@ int main (int argc, char** argv)
       twoD = SIMElasticity<SIM2D>::planeStrain = true;
     else if (!strcmp(argv[i],"-nocrack"))
       args.coupling = 0;
-    else if (!strcmp(argv[i],"-semiimplicit"))
-      args.coupling = 2;
     else if (!strcmp(argv[i],"-lstatic"))
       args.integrator = 0;
     else if (!strcmp(argv[i],"-GA"))
@@ -331,6 +350,9 @@ int main (int argc, char** argv)
               <<" [-nw <nw>]] [-hdf5] [-principal]\n"<< std::endl;
     return 0;
   }
+
+  if (strcasestr(args.inpfile,".xinp"))
+    args.read(args.inpfile);
 
   if (args.adaptive)
     IFEM::getOptions().discretization = ASM::LRSpline;
