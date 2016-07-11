@@ -78,6 +78,8 @@ protected:
   double smearing; //!< Smearing factor in crack
   double stabk;    //!< Stabilization parameter
   bool   use4th;   //!< If \e true, use 4th order phase field model
+  double gamma;    //!< Penalty parameter enforcing crack irreversibility
+  double crtol;    //!< Phase-field treshold for irreversibility enforcement
 };
 
 #endif

@@ -22,8 +22,8 @@
 FractureElasticityMonol::FractureElasticityMonol (unsigned short int n, int ord)
   : FractureElasticityVoigt(n)
 {
-  Gc = smearing = 1.0;
-  stabk = 0.0;
+  Gc = smearing = gamma = 1.0;
+  stabk = crtol = 0.0;
   use4th = ord == 4;
   npv = nsd + 1;
 }
@@ -38,6 +38,10 @@ bool FractureElasticityMonol::parse (const TiXmlElement* elem)
     smearing = atof(value);
   else if ((value = utl::getValue(elem,"stabilization")))
     stabk = atof(value);
+  else if ((value = utl::getValue(elem,"penalty_factor"))) {
+    gamma = atof(value);
+    utl::getAttribute(elem,"threshold",crtol);
+  }
   else
     return this->FractureElasticityVoigt::parse(elem);
 
@@ -55,7 +59,8 @@ void FractureElasticityMonol::printLog () const
     IFEM::cout <<"\n\tStabilization parameter: "<< stabk;
   if (use4th)
     IFEM::cout <<"\n\tUsing fourth-order phase field.";
-  IFEM::cout << std::endl;
+  IFEM::cout <<"\n\tPenalty parameter: "<< gamma
+             <<" (threshold value: "<< crtol <<")"<< std::endl;
 }
 
 
@@ -174,9 +179,11 @@ bool FractureElasticityMonol::evalInt (LocalIntegral& elmInt,
     Matrix& A = static_cast<ElmMats&>(elmInt).A[eAcc-1];
 
     double PhiPl = myPhi[fe.iGP];
-    double scale = 1.0 + 4.0*smearing*(1.0-stabk)*PhiPl/Gc;
+    double scale = 0.5*Gc/smearing + 2.0*(1.0-stabk)*PhiPl;
     double s1JxW = scale*fe.detJxW;
-    double s2JxW = (use4th ? 2.0 : 4.0)*smearing*smearing*fe.detJxW;
+    double s2JxW = (use4th ? 1.0 : 2.0)*Gc*smearing*fe.detJxW;
+    if (fe.N.dot(elmInt.vec[eC]) < crtol)
+      s1JxW -= fe.detJxW/gamma;
 
     for (size_t i = 1; i <= fe.N.size(); i++)
       for (size_t j = 1; j <= fe.N.size(); j++)
@@ -190,7 +197,7 @@ bool FractureElasticityMonol::evalInt (LocalIntegral& elmInt,
     if (use4th)
     {
       // Forth-order phase field
-      double s4JxW = pow(smearing,4.0)*fe.detJxW;
+      double s4JxW = 0.5*Gc*pow(smearing,3.0)*fe.detJxW;
 
       for (size_t i = 1; i <= fe.N.size(); i++)
         for (size_t j = 1; j <= fe.N.size(); j++)
@@ -204,7 +211,7 @@ bool FractureElasticityMonol::evalInt (LocalIntegral& elmInt,
   }
 
   if (eBc)
-    static_cast<ElmMats&>(elmInt).b[eBc-1].add(fe.N,fe.detJxW);
+    static_cast<ElmMats&>(elmInt).b[eBc-1].add(fe.N,0.5*Gc/smearing*fe.detJxW);
 
   return true;
 }
