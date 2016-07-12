@@ -29,13 +29,15 @@ class SIMDynElasticity : public SIMElasticity<Dim>
 {
 public:
   //! \brief Default constructor.
-  SIMDynElasticity(bool mon = false) : SIMElasticity<Dim>(false), dSim(*this)
+  SIMDynElasticity(bool monol = false) : SIMElasticity<Dim>(false), dSim(*this)
   {
     Dim::myHeading = "Elasticity solver";
-    if ((monolithic = mon))
-      ++Dim::nf[0]; // Account for the phase field as an unknown field variable
+    monolithic = monol;
     phOrder = 2;
     vtfStep = 0;
+
+    if (monolithic)
+      ++Dim::nf[0]; // Account for the phase field as an unknown field variable
   }
 
   //! \brief Empty destructor.
@@ -67,6 +69,15 @@ public:
   {
     dSim.initPrm();
     dSim.initSol(3);
+    if (monolithic)
+    {
+      // Insert initial phase field solution 1.0 (undamaged material)
+      size_t nndof = Dim::nf[0];
+      Vector sol(this->getNoDOFs());
+      for (size_t d = nndof-1; d < sol.size(); d += nndof)
+        sol[d] = 1.0;
+      dSim.setSolution(sol,0);
+    }
 
     this->setMode(SIM::INIT);
     this->setQuadratureRule(Dim::opt.nGauss[0],true);
