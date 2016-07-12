@@ -254,17 +254,25 @@ public:
                           eHistory.front()-eHistory.back()) * 180 / M_PI;
 
       IFEM::cout << " beta=" <<  beta;
+      if (this->S1.getSubitRelaxation() != 1.0) {
+        Vector sol = this->S1.getSolution(0);
+        sol *= this->S1.getSubitRelaxation();
+        sol.add(prev_sol, (1.0-this->S1.getSubitRelaxation()));
+        IFEM::cout << " omega=" << this->S1.getSubitRelaxation();
+      }
     }
     IFEM::cout << std::endl;
+    if (omega != 1.0)
+      prev_sol = this->S1.getSolution(0);
 
-    if (eHistory.back()/eHistory.front() < 1e-4) {
+    if (eHistory.back()/eHistory.front() < this->S1.getSubitTolerance()) {
       eHistory.clear();
       return SIM::CONVERGED;
     }
 
-    static const int maxSubIt = 1000; // TODO: Max 50 subiterations hardcoded
-    if (eHistory.size() > maxSubIt) {
-      std::cerr << "FractureDynamics::checkConvergence: Did not converge in maxSubIt sub-iterations, bailing.." << std::endl;
+    if (eHistory.size() > (size_t)this->S1.getMaxit()) {
+      std::cerr << "FractureDynamics::checkConvergence: Did not converge in "
+                << this->S1.getMaxit() << " sub-iterations, bailing.." << std::endl;
       return SIM::DIVERGED;
     }
 
@@ -279,6 +287,8 @@ private:
   Vectors   sols; //!< Solution state to transfer onto refined mesh
   RealArray hsol; //!< History field to transfer onto refined mesh
   RealArray eHistory; //!< Energy history for quasi-static simulations
+  Vector prev_sol; //!< Previous displacement solution. Used with relaxation.
+  double omega = 1.0; //!< Relaxation factor
 };
 
 #endif

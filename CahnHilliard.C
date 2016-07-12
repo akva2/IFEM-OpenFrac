@@ -119,7 +119,7 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
   if (pgamma != 1.0 && !elmInt.vec.empty() &&!elmInt.vec.front().empty()) {
     d = fe.N.dot(elmInt.vec.front());
     if (d < pthresh)
-      s1JxW -= 1.0/pgamma*fe.detJxW;
+      s1JxW -= fe.detJxW/pgamma;
   }
 
   Matrix& A = static_cast<ElmMats&>(elmInt).A.front();

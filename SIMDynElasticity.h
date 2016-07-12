@@ -208,6 +208,7 @@ public:
   //! \param[in] tp Time stepping parameters
   SIM::ConvStatus solveIteration(TimeStep& tp)
   {
+    this->setMode(SIM::STATIC);
     return subIt == 1 ? dSim.solveStep(tp) : dSim.solveIteration(tp);
   }
 
@@ -216,6 +217,9 @@ public:
 
   //! \brief Returns sub-iteration tolerance.
   double getSubitTolerance() const { return subItTol; }
+
+  //! \brief Relaxation parameter for sub-iterations.
+  double getSubitRelaxation() const { return subItOmega; }
 
 protected:
   //! \brief Returns the actual integrand.
@@ -246,6 +250,7 @@ protected:
           subIt = 0;
         utl::getAttribute(child,"tol",subItTol);
         utl::getAttribute(child,"max",maxSubIt);
+        utl::getAttribute(child,"omega",subItOmega);
       }
       result = this->SIMElasticity<Dim>::parse(elem);
     }
@@ -267,6 +272,7 @@ private:
   int subIt = 1;          //!< Sub-iteration type to use
   int maxSubIt = 100;     //!< Maximum number of sub-iterations
   double subItTol = 1e-4; //!< Tolerance in sub-iterations
+  double subItOmega = 1.0; //!< Relaxation for sub-iterations
 };
 
 #endif
