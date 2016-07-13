@@ -106,7 +106,7 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
       H = (0.25*Gc/smearing) * (1.0/maxCrack-1.0) * (1.0-dist/smearing);
   } else {
     // Update history field
-    if (pgamma == 1.0 && tensileEnergy)
+    if (pgamma == 1.0)
       H = std::max(H,(*tensileEnergy)[fe.iGP]);
     else
       H = (*tensileEnergy)[fe.iGP];
@@ -119,7 +119,7 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
   if (pgamma != 1.0 && !elmInt.vec.empty() &&!elmInt.vec.front().empty()) {
     d = fe.N.dot(elmInt.vec.front());
     if (d < pthresh)
-      s1JxW -= fe.detJxW/pgamma;
+      s1JxW += 2*smearing*fe.detJxW/(Gc*pgamma);
   }
 
   Matrix& A = static_cast<ElmMats&>(elmInt).A.front();
