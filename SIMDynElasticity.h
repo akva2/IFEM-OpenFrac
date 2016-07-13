@@ -18,6 +18,7 @@
 #include "SIMElasticity.h"
 #include "FractureElasticityMonol.h"
 #include "DataExporter.h"
+#include <fstream>
 
 
 /*!
@@ -105,9 +106,34 @@ public:
     bool ok = this->savePoints(dSim.getSolution(),tp.time.t,tp.step);
     utl::zero_print_tol = old;
 
+    if (!energFile.empty() && Dim::adm.getProcId() == 0 && tp.step > 0)
+    {
+      size_t i;
+      Vector aLoad, react; // Integrate forces along specified boundary, if any
+      this->getBoundaryForce(aLoad,dSim.getSolutions(),tp);
+      this->getBoundaryReactions(react);
+
+      // Write global energies and load resultants to the energyFile
+      std::ofstream os(energFile, tp.step == 1 ? std::ios::out : std::ios::app);
+      if (tp.step == 1)
+      {
+        os <<"#t eps_e external_energy eps+ eps- eps_b ";
+        for (i = 0; i < aLoad.size(); i++) os <<" load_"<< char('X'+i);
+        for (i = 0; i < react.size(); i++) os <<" react_"<< char('X'+i);
+        os <<"\n";
+      }
+      os << std::setprecision(11) << std::setw(6) << std::scientific;
+      os << tp.time.t;
+      for (i = 0; i < gNorm.size(); i++) os <<" "<< gNorm[i];
+      for (i = 0; i < aLoad.size(); i++) os <<" "<< utl::trunc(aLoad[i]);
+      for (i = 0; i < react.size(); i++) os <<" "<< utl::trunc(react[i]);
+      os <<"\n";
+    }
+
     if (tp.step%Dim::opt.saveInc > 0 || Dim::opt.format < 0 || !ok)
       return ok;
 
+    // Write primary and secondary (of requested) solution fields to VTF-file
     if (!dSim.saveStep(++vtfStep,nBlock,tp.time.t))
       return false;
     else if (tp.step < 1)
@@ -181,7 +207,8 @@ public:
                    << gNorm(3) <<" "<< gNorm(4) << std::endl;
       if (gNorm.size() > 1 && utl::trunc(gNorm(2)) != 0.0)
         IFEM::cout <<"  External energy: ((f,u^h)+(t,u^h))^0.5 : "
-                   << sqrt(gNorm(2)) << std::endl;
+                   << (gNorm(2) < 0.0 ? -sqrt(-gNorm(2)) : sqrt(gNorm(2)))
+                   << std::endl;
     }
 
     return true;
@@ -196,8 +223,15 @@ public:
   //! \brief Returns a const reference to the global norms.
   const Vector& getGlobalNorms() const { return gNorm; }
 
-  //! \brief Dummy method.
-  void setEnergyFile(const std::string&) {}
+  //! \brief Assigns the file name for global energy output (monolithic only).
+  void setEnergyFile(const char* fName)
+  {
+    if (monolithic && fName)
+    {
+      energFile = fName;
+      IFEM::cout <<"\tFile for global energy output: "<< energFile << std::endl;
+    }
+  }
 
   //! \brief Returns a const reference to current solution vector.
   const Vector& getSolution(int idx = 0) const { return dSim.getSolution(idx); }
@@ -275,6 +309,8 @@ private:
   int  phOrder;    //!< Phase-field order when monolithic coupling
   int  vtfStep;    //!< VTF file step counter
   bool monolithic; //!< If \e true, use the monolithic integrand
+
+  std::string energFile; //!< File name for global energy output (monolithic)
 };
 
 #endif
