@@ -20,6 +20,9 @@
 #include "LRSpline/LRSplineSurface.h"
 #endif
 #include <fstream>
+#include "DataExporter.h"
+#include "HDF5Writer.h"
+#include "XMLWriter.h"
 
 
 /*!
@@ -35,7 +38,15 @@ class SIMFracture : public Coupling<SolidSolver,PhaseSolver>
 public:
   //! \brief The constructor initializes the references to the two solvers.
   SIMFracture(SolidSolver& s1, PhaseSolver& s2, const std::string& inputfile)
-    : Coupling<SolidSolver,PhaseSolver>(s1,s2), infile(inputfile), aMin(0.0) {}
+    : Coupling<SolidSolver,PhaseSolver>(s1,s2), infile(inputfile), aMin(0.0),
+    exp(true)
+  {
+    exp.registerWriter(new HDF5Writer("residual", s1.getProcessAdm()));
+    exp.registerWriter(new XMLWriter("residual", s2.getProcessAdm()));
+    exp.registerField("residual", "residual", DataExporter::SIM, -DataExporter::PRIMARY);
+    exp.setFieldValue("residual", &s1, &residual);
+  }
+
   //! \brief Empty destructor.
   virtual ~SIMFracture() {}
 
@@ -241,8 +252,8 @@ public:
     if (!this->S1.assembleSystem(tp.time,this->S1.getSolutions(),false))
       return SIM::DIVERGED;
 
-    Vector residual;
     this->S1.extractLoadVec(residual);
+    exp.dumpTimeLevel();
 
     eHistory.resize(eHistory.size()+1);
     double dummy;
@@ -291,7 +302,9 @@ private:
   RealArray hsol; //!< History field to transfer onto refined mesh
   RealArray eHistory; //!< Energy history for quasi-static simulations
   Vector prev_sol; //!< Previous displacement solution. Used with relaxation.
+  Vector residual; //!< Residual. Right now a member due hdf5 writing.
   double omega = 1.0; //!< Relaxation factor
+  DataExporter exp; 
 };
 
 #endif
