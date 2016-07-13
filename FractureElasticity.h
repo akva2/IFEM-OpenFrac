@@ -121,6 +121,8 @@ private:
   Vector myCVec; //!< Crack phase field values at control (nodal) points
 
 protected:
+  bool noSplit; //!< If \e true, no strain energy split, just isotropic scaling
+
   unsigned short int eC; //!< Zero-based index to element phase field vector
 
   mutable RealArray myPhi; //!< Tensile energy density at integration points

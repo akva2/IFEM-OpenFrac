@@ -32,6 +32,7 @@
 FractureElasticity::FractureElasticity (unsigned short int n)
   : Elasticity(n), mySol(primsol)
 {
+  noSplit = false;
   alpha = 0.0;
   this->registerVector("phasefield",&myCVec);
   eC = 1; // Assuming second vector is phase field
@@ -42,6 +43,7 @@ FractureElasticity::FractureElasticity (IntegrandBase* parent,
                                         unsigned short int n)
   : Elasticity(n), mySol(parent->getSolutions())
 {
+  noSplit = false;
   alpha = 0.0;
   parent->registerVector("phasefield",&myCVec);
   // Assuming second vector is pressure, third vector is pressure velocity
@@ -62,6 +64,8 @@ bool FractureElasticity::parse (const TiXmlElement* elem)
   const char* value = utl::getValue(elem,"stabilization");
   if (value)
     alpha = atof(value);
+  else if (!strcasecmp(elem->Value(),"noEnergySplit"))
+    noSplit = true;
   else
     return this->Elasticity::parse(elem);
 
@@ -75,6 +79,11 @@ void FractureElasticity::printLog () const
 
   if (alpha != 0.0)
     IFEM::cout <<"\tStabilization parameter: "<< alpha << std::endl;
+
+  if (noSplit)
+    IFEM::cout <<"\tIsotropic degrading of strain energy density."<< std::endl;
+  else
+    IFEM::cout <<"\tDegrading of tensile strain energy density."<< std::endl;
 }
 
 
@@ -269,6 +278,7 @@ double FractureElasticity::getStressDegradation (const Vector& N,
 
   // Evaluate the crack phase field function, c(X)
   double c = eV[eC].empty() ? 1.0 : N.dot(eV[eC]);
+  if (c > 1.0) c = 1.0; // Ignore values larger than 1.0
 
   if (derivative > 0) // Evaluate the 1st derivative of g(c)
     return c > 0.0 ? (1.0-alpha)*c*2.0 : 0.0;
