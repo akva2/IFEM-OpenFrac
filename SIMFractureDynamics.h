@@ -278,8 +278,9 @@ public:
     if (omega != 1.0)
       prev_sol = this->S1.getSolution(0);
 
-    if ((beta >= 0.0 && beta < 2.0) ||
-        eHistory.back()/eHistory.front() < this->S1.getSubitTolerance()) {
+    if (eHistory.size() == 9) {
+//    if ((beta >= 0.0 && beta < 2.0) ||
+//        eHistory.back()/eHistory.front() < this->S1.getSubitTolerance()) {
       eHistory.clear();
       return SIM::CONVERGED;
     }
