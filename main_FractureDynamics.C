@@ -29,7 +29,7 @@
 
 
 //! \brief A struct collecting the command-line argument values.
-struct FDargs : public XMLInputBase
+struct FDargs : public AppXMLInputBase
 {
   //! Time integrator to use (0=linear quasi-static, no phase-field coupling,
   //! 1=linear Newmark, 2=linear generalized alpha, 3=nonlinear quasi-static,
@@ -46,6 +46,11 @@ struct FDargs : public XMLInputBase
   virtual bool parse(const TiXmlElement* elem)
   {
     if (!strcasecmp(elem->Value(),"elasticity")) {
+      std::string form;
+      utl::getAttribute(elem, "formulation", form);
+      if (form == "qstatic")
+        integrator = 3;
+
       const TiXmlElement* child = elem->FirstChildElement();
       for (; child; child= child->NextSiblingElement())
         if (!strcasecmp(child->Value(),"subiterations")) {
@@ -56,7 +61,7 @@ struct FDargs : public XMLInputBase
         }
     }
 
-    return true;
+    return this->AppXMLInputBase::parse(elem);
   }
 
   bool read(const char* inputFile)
@@ -308,16 +313,17 @@ int main (int argc, char** argv)
   Profiler prof(argv[0]);
 
   FDargs args;
-  bool   twoD = false;
 
   IFEM::Init(argc,argv,"Fracture dynamics solver");
 
+  int ignoreArg = -1;
   for (int i = 1; i < argc; i++)
-    if (SIMoptions::ignoreOldOptions(argc,argv,i))
+    if (SIMoptions::ignoreOldOptions(argc,argv,i) || i == ignoreArg)
       ; // ignore the obsolete option
-    else if (!strcmp(argv[i],"-2D"))
-      twoD = SIMElasticity<SIM2D>::planeStrain = true;
-    else if (!strcmp(argv[i],"-nocrack"))
+    else if (!strcmp(argv[i],"-2D")) {
+      args.dim = 2;
+      SIMElasticity<SIM2D>::planeStrain = true;
+    } else if (!strcmp(argv[i],"-nocrack"))
       args.coupling = 0;
     else if (!strcmp(argv[i],"-lstatic"))
       args.integrator = 0;
@@ -335,9 +341,14 @@ int main (int argc, char** argv)
       FractureElasticNorm::dbgElm = atoi(argv[++i]);
     else if (!strncmp(argv[i],"-adap",5))
       args.adaptive = true;
-    else if (!args.inpfile)
+    else if (!args.inpfile) {
       args.inpfile = argv[i];
-    else
+      if (strcasestr(args.inpfile,".xinp")) {
+        args.read(args.inpfile);
+        ignoreArg = i;
+        i = 0;
+      }
+    } else
       std::cerr <<"  ** Unknown option ignored: "<< argv[i] << std::endl;
 
   if (!args.inpfile)
@@ -351,8 +362,6 @@ int main (int argc, char** argv)
     return 0;
   }
 
-  if (strcasestr(args.inpfile,".xinp"))
-    args.read(args.inpfile);
 
   if (args.adaptive)
     IFEM::getOptions().discretization = ASM::LRSpline;
@@ -360,7 +369,7 @@ int main (int argc, char** argv)
   IFEM::cout <<"\nInput file: "<< args.inpfile;
   IFEM::getOptions().print(IFEM::cout) << std::endl;
 
-  if (twoD)
+  if (args.dim == 2)
     return runSimulator<SIM2D>(args);
   else
     return runSimulator<SIM3D>(args);

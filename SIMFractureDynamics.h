@@ -249,9 +249,11 @@ public:
     this->S1.iterationNorms(residual, residual, dummy, eHistory.back(), dummy);
 
     IFEM::cout << "   subit=" << eHistory.size()-1 <<" conv=" << eHistory.back()/eHistory.front();
+    double beta = 10.0;
     if (eHistory.size() > 1) {
-      double beta = atan2(eHistory[eHistory.size()-2]-eHistory.back(),
-                          eHistory.front()-eHistory.back()) * 180 / M_PI;
+      double dE = eHistory[eHistory.size()-2]-eHistory.back();
+      beta = atan2((eHistory.size()-1)*dE,
+                    eHistory.front()-eHistory.back()) * 180 / M_PI;
 
       IFEM::cout << " beta=" <<  beta;
       if (this->S1.getSubitRelaxation() != 1.0) {
@@ -265,7 +267,8 @@ public:
     if (omega != 1.0)
       prev_sol = this->S1.getSolution(0);
 
-    if (eHistory.back()/eHistory.front() < this->S1.getSubitTolerance()) {
+    if ((beta >= 0.0 && beta < 2.0) ||
+        eHistory.back()/eHistory.front() < this->S1.getSubitTolerance()) {
       eHistory.clear();
       return SIM::CONVERGED;
     }
