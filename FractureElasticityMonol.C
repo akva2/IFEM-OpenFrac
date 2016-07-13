@@ -172,15 +172,8 @@ bool FractureElasticityMonol::evalInt (LocalIntegral& elmInt,
   if (eAcc)
   {
     Matrix& A = static_cast<ElmMats&>(elmInt).A[eAcc-1];
-
-    for (size_t i = 1; i <= fe.N.size(); i++)
-      for (size_t j = 1; j <= fe.N.size(); j++)
-      {
-        double grad = 0.0;
-        for (size_t k = 1; k <= nsd; k++)
-          grad += fe.dNdX(i,k)*fe.dNdX(j,k);
-        A(i,j) += fe.N(i)*fe.N(j)*s1JxW + grad*s2JxW;
-      }
+    A.outer_product(fe.N, fe.N, true, s1JxW);
+    A.multiply(fe.dNdX, fe.dNdX, false, true, true, s2JxW);
 
     if (use4th)
     {
