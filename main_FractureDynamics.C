@@ -26,6 +26,7 @@
 #include "NonLinSIM.h"
 #include "ASMstruct.h"
 #include "AppCommon.h"
+#include "CubicMinimum.h"
 
 
 //! \brief A struct collecting the command-line argument values.
@@ -83,6 +84,74 @@ protected:
 
 private:
   const char* context; //!< XML-tag to search for time-stepping input within
+};
+
+
+class NonLinSIMFracture : public NonLinSIM
+{
+public:
+  NonLinSIMFracture(SIMbase& sim, CNORM n = ENERGY) : NonLinSIM(sim, ENERGY) {}
+
+  bool lineSearch(TimeStep& param) override
+  {
+    alpha = 1.0;
+
+    Vector sol = solution.front();
+    Vectors gNorm;
+    if (!model.solutionNorms(param.time,Vectors(1,sol),gNorm, nullptr))
+      return false;
+
+    double prev = gNorm[0](6) + gNorm[0](1); // TODO: is this correct?
+
+    sol += linsol;
+    if (!model.solutionNorms(param.time,Vectors(1,sol),gNorm, nullptr))
+      return false;
+
+    double now = gNorm[0](6) + gNorm[0](1); // TODO: is this correct?
+
+    std::cout << "line search? now: " << now << " prev " << prev << std::endl;
+    if (param.iter < 2 || now < prev) {
+      prev = now;
+      return true;
+    }
+
+    std::cout << "line searching" << std::endl;
+
+    std::vector<double> params(10);
+    std::vector<double> vals(params.size());
+    std::vector<double> derivs(params.size());
+    for (size_t i = 0; i < params.size(); ++i) {
+      params[i] = -1.0 + i*2.0/(params.size()-1);
+
+      Vector sol = solution.front();
+      sol.add(linsol, params[i]);
+
+      model.setMode(SIM::RHS_ONLY);
+      if (!model.assembleSystem(param.time,Vectors(1,sol),false))
+        return false;
+
+      if (!model.extractLoadVec(residual))
+        return false;
+
+      Vectors gNorm;
+      if (!model.solutionNorms(param.time,Vectors(1,sol),gNorm, nullptr))
+        return false;
+
+      vals[i] = gNorm[0](6) + gNorm[0](1); // TODO: is this correct?
+      derivs[i] = residual.dot(linsol);
+    }
+
+    for (auto& it : vals)
+      std::cout << it << " ";
+    std::cout << std::endl;
+    for (auto& it : derivs)
+      std::cout << it << " ";
+    std::cout << std::endl;
+    if (!CubicMinimum::Find(alpha, params, vals, derivs))
+      return false;
+
+    return true;
+  }
 };
 
 
@@ -270,7 +339,7 @@ int runSimulator (const FDargs& args)
   case 2:
     return runSimulator1<Dim,GenAlphaSIM>(args);
   case 3:
-    return runSimulator1<Dim,NonLinSIM>(args);
+    return runSimulator1<Dim,NonLinSIMFracture>(args);
   case 4:
     return runSimulator1<Dim,HHTSIM>(args);
   case 5:
