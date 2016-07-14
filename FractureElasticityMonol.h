@@ -80,6 +80,12 @@ public:
   //! \param[in] prefix Name prefix for all components
   virtual std::string getField1Name(size_t i, const char* prefix) const;
 
+  //! \brief Returns a pointer to an Integrand for solution norm evaluation.
+  //! \note The Integrand object is allocated dynamically and has to be deleted
+  //! manually when leaving the scope of the pointer variable receiving the
+  //! returned pointer value.
+  virtual NormBase* getNormIntegrand(AnaSol*) const;
+
 protected:
   //! \brief Extracts element solution vectors from the patch solution vectors.
   //! \param[out] eV Element solution vectors
@@ -95,6 +101,32 @@ private:
   bool   use4th;   //!< If \e true, use 4th order phase field model
   double gammaInv; //!< Penalty parameter enforcing crack irreversibility
   double crtol;    //!< Phase-field treshold for irreversibility enforcement
+
+  friend class FractureElasticMonolNorm;
+};
+
+
+class FractureElasticMonolNorm : public FractureElasticNorm
+{
+public:
+  //! \brief The constructor invokes the parent class constructor only.
+  //! \param[in] p The elasticity problem to evaluate norms for
+  FractureElasticMonolNorm(FractureElasticityMonol& p);
+  //! \brief Empty destructor.
+  virtual ~FractureElasticMonolNorm() {}
+
+  using FractureElasticNorm::evalInt;
+  //! \brief Evaluates the integrand at an interior point.
+  //! \param elmInt The local integral object to receive the contributions
+  //! \param[in] fe Finite element data of current integration point
+  //! \param[in] X Cartesian coordinates of current integration point
+  virtual bool evalInt(LocalIntegral& elmInt, const FiniteElement& fe,
+                       const Vec3& X) const;
+
+  //! \brief Returns the number of norm quantities.
+  virtual size_t getNoFields(int group) const;
+  //! \brief Returns the name of a norm quantity.
+  virtual std::string getName(size_t, size_t j, const char*) const;
 };
 
 #endif

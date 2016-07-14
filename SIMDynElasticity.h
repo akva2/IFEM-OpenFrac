@@ -209,6 +209,9 @@ public:
         IFEM::cout <<"  External energy: ((f,u^h)+(t,u^h))^0.5 : "
                    << (gNorm(2) < 0.0 ? -sqrt(-gNorm(2)) : sqrt(gNorm(2)))
                    << std::endl;
+      if (monolithic && gNorm.size() > 5 && utl::trunc(gNorm(6)) != 0.0)
+        IFEM::cout <<"  Dissipated energy:               eps_d : "
+                   << gNorm(6) << std::endl;
     }
 
     return true;
