@@ -14,7 +14,6 @@
 #ifndef _SIM_PHASE_FIELD_H
 #define _SIM_PHASE_FIELD_H
 
-#include "InitialConditionHandler.h"
 #include "CahnHilliard.h"
 #ifdef HAS_LRSPLINE
 #include "ASMu2D.h"
@@ -76,7 +75,7 @@ public:
     this->setMode(SIM::INIT);
     this->setQuadratureRule(Dim::opt.nGauss[0],true);
     this->registerField("phasefield",phasefield);
-    return SIM::setInitialConditions(*this);
+    return this->setInitialConditions();
   }
 
   //! \brief Opens a new VTF-file and writes the model geometry to it.
