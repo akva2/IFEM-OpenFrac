@@ -302,7 +302,9 @@ public:
     else if (status1 != SIM::CONVERGED || status2 != SIM::CONVERGED)
       return SIM::OK;
 
-    // Compute residual
+    int cycle = rHistory.size();
+
+    // Compute residual of the elasticity equation
     this->S1.setMode(SIM::RHS_ONLY);
     if (!this->S1.assembleSystem(tp.time,this->S1.getSolutions(),false))
       return SIM::FAILURE;
@@ -311,19 +313,31 @@ public:
     if (!this->S1.extractLoadVec(residual))
       return SIM::FAILURE;
 
-    int cycle = rHistory.size();
-    double dummy, rNorm;
-    this->S1.iterationNorms(Vector(), residual, dummy, rNorm, dummy);
-    rHistory.push_back(rNorm);
+    double rNorm1 = residual.norm2();
 
-    double beta = 10.0, rConv = rNorm/rHistory.front();
-    IFEM::cout <<"  cycle="<< cycle <<"  conv="<< rConv;
+    // Compute residual of the phase-field equation
+    if (!this->S2.setMode(SIM::INT_FORCES))
+      return SIM::FAILURE;
+
+    Vectors sol2(1,this->S2.getSolution());
+    if (!this->S2.assembleSystem(tp.time,sol2,false))
+      return SIM::FAILURE;
+
+    if (!this->S2.extractLoadVec(residual))
+      return SIM::FAILURE;
+
+    double rNorm2 = residual.norm2();
+
+    rHistory.push_back(rNorm1+rNorm2);
+    double rConv = rHistory.back()/rHistory.front();
+    IFEM::cout <<"  cycle="<< cycle <<"  res1="<< rNorm1 <<"  res2="<< rNorm2
+               <<"  conv="<< rConv;
     if (cycle > 0)
     {
       double r0 = rHistory.front();
+      double r1 = rHistory.back();
       double r2 = rHistory[cycle-1];
-      beta = atan2(cycle*(r2-rNorm),r0-rNorm) * 180.0/M_PI;
-      IFEM::cout <<"  beta="<< beta;
+      IFEM::cout <<"  beta="<< atan2(cycle*(r2-r1),r0-r1) * 180.0/M_PI;
     }
     IFEM::cout << std::endl;
 
