@@ -103,6 +103,16 @@ void CahnHilliard::initIntegration (size_t nIp, size_t)
 }
 
 
+LocalIntegral* CahnHilliard::getLocalIntegral (size_t nen, size_t,
+                                               bool neumann) const
+{
+  LocalIntegral* li = this->IntegrandBase::getLocalIntegral(nen,0,neumann);
+  if (m_mode >= SIM::RHS_ONLY && !neumann)
+    static_cast<ElmMats*>(li)->c.resize(1); // Total dissipation energy
+  return li;
+}
+
+
 bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
                             const Vec3& X) const
 {
@@ -124,12 +134,21 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
 
   // Evaluate the current phase field, if provided
   double C = elmInt.vec.front().empty() ? 1.0 : fe.N.dot(elmInt.vec.front());
+#if INT_DEBUG > 3
+  if (C < 1.0)
+    std::cout <<"\nCahnHilliard::evalInt(X = "<< X <<"): C = "<< C << std::endl;
+#endif
 
   double scale = 1.0 + 4.0*(1.0-stabk)*H/GcOell;
   if (gammaInv > 0.0 && C < pthresh)
     scale += gammaInv/GcOell;
   double s1JxW = scale*fe.detJxW;
   double s2JxW = scale2nd*smearing*smearing*fe.detJxW;
+#if INT_DEBUG > 3
+  if (gammaInv > 0.0 && C < pthresh)
+    std::cout <<"\tIn crack: scale "<< scale-gammaInv/GcOell
+              <<" --> "<< scale <<"\n";
+#endif
 
   if (m_mode == SIM::STATIC)
   {
@@ -143,6 +162,7 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
   else if (m_mode == SIM::INT_FORCES && !elmInt.vec.front().empty())
   {
     Vector& R = static_cast<ElmMats&>(elmInt).b.front();
+    double& D = static_cast<ElmMats&>(elmInt).c.front();
 
     // Apply scaling Gc/ell compared to the STATIC mode, such that
     // the resulting residual force vector has comparable dimension
@@ -155,6 +175,11 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
     Vector gradC; // Compute the phase field gradient gradC = dNdX^t*eC
     if (!fe.dNdX.multiply(elmInt.vec.front(),gradC,true))
       return false;
+
+    // Dissipated energy
+    D += Gc*(pow(C-1.0,2.0)/smearing/4.0 + smearing*gradC.dot(gradC))*fe.detJxW;
+    if (gammaInv > 0.0 && C < pthresh)
+      D += 0.5*gammaInv*C*C*fe.detJxW;
 
     gradC *= -s2JxW;
     return fe.dNdX.multiply(gradC,R,false,true); // R -= dNdX*gradC*s2JxW
