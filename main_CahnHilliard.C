@@ -47,7 +47,7 @@ template<class Dim> int runSimulator (char* infile)
     return 2;
 
   // Initialize the linear solvers
-  if (!phaseSim.initSystem(phaseSim.opt.solver,1,1,false))
+  if (!phaseSim.initSystem(phaseSim.opt.solver))
     return 2;
 
   // Time-step loop
