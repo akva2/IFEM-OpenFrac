@@ -324,10 +324,10 @@ double FractureElasticity::getStressDegradation (const Vector& N,
                                                  const Vectors& eV) const
 {
   // Evaluate the crack phase field function, c(X)
-  double c = eV[eC].empty() ? 1.0 : N.dot(eV[eC]);
-  if (c > 1.0) c = 1.0; // Ignore values larger than 1.0
+  double d = eV[eC].empty() ? 0.0 : N.dot(eV[eC]);
+  double c = 1.0-d;
   // Evaluate the stress degradation function, g(c), ignoring negative values
-  return c > 0.0 ? (1.0-alpha)*c*c + alpha : alpha;
+  return c*c;
 }
 
 

@@ -131,22 +131,22 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
   }
 
   // Evaluate the previous phase field, if provided
-  double C = elmInt.vec.back().empty() ? 1.0 : fe.N.dot(elmInt.vec.back());
-  bool inCrack = gammaInv > 0.0 && C < pthresh;
+  double C = elmInt.vec.back().empty() ? 0.0 : fe.N.dot(elmInt.vec.back());
+  bool inCrack = gammaInv > 0.0 && C > 1.0-pthresh;
 #if INT_DEBUG > 3
   std::cout <<"\nCahnHilliard::evalInt(X = "<< X <<"): C = "<< C << std::endl;
 #endif
 
-  double scale = 1.0 + 4.0*(1.0-stabk)*H/GcOell;
+  double scale = Gc/smearing + 2*H;
   if (inCrack)
-    scale += gammaInv/GcOell;
+    scale += gammaInv;
   double s1JxW = scale*fe.detJxW;
-  double s2JxW = scale2nd*smearing*smearing*fe.detJxW;
-#if INT_DEBUG > 3
+  double s2JxW = Gc*smearing*fe.detJxW;
+//#if INT_DEBUG > 3
   if (inCrack)
-    std::cout <<"\tIn crack: scale "<< scale-gammaInv/GcOell
-              <<" --> "<< scale <<"\n";
-#endif
+    std::cout <<"\tIn crack: scale "<< scale-gammaInv
+              <<" --> "<< scale << " " << X << "\n";
+//#endif
 
   if (m_mode == SIM::STATIC)
   {
@@ -155,7 +155,10 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
     A.outer_product(fe.N,fe.N,true,s1JxW);             // A +=  N  * N^t  *s1JxW
     A.multiply(fe.dNdX,fe.dNdX,false,true,true,s2JxW); // A += dNdX*dNdX^t*s2JxW
 
-    static_cast<ElmMats&>(elmInt).b.front().add(fe.N,fe.detJxW); // R += N*|J|*W
+    if (inCrack)
+      static_cast<ElmMats&>(elmInt).b.front().add(fe.N,(2*H+gammaInv)*fe.detJxW); // R += N*|J|*W
+    else
+      static_cast<ElmMats&>(elmInt).b.front().add(fe.N,2*H*fe.detJxW); // R += N*|J|*W
   }
   else if (m_mode == SIM::INT_FORCES && !elmInt.vec.front().empty())
   {
@@ -171,23 +174,20 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
 
     // Evaluate the dissipated energy
     double D = 1.0 - C;
-    E += Gc*(0.25*D*D/smearing + smearing*gradC.dot(gradC))*fe.detJxW;
+    E += Gc*(0.5*C*C/smearing + smearing/2.0*gradC.dot(gradC))*fe.detJxW;
     if (inCrack)
-      E += 0.5*gammaInv*C*C*fe.detJxW;
+      E += 0.5*gammaInv*D*D*fe.detJxW;
 
 #if INT_DEBUG > 3
     std::cout <<"C = "<< C <<"  E = "<< E << std::endl;
 #endif
 
-    // Apply scaling Gc/ell compared to the STATIC mode, such that
-    // the resulting residual force vector has comparable dimension
-    // as the residual forces of the elasticity equation
-    s1JxW  = GcOell*(1.0 - C*scale)*fe.detJxW;
-    s2JxW *= GcOell;
+    R.add(fe.N, Gc/smearing*C*fe.detJxW);
+    R.add(fe.N, -2*H*D*fe.detJxW);
+    if (inCrack)
+      R.add(fe.N, -gammaInv*D*fe.detJxW);
 
-    R.add(fe.N,s1JxW); // R += N*s1JxW
-
-    gradC *= -s2JxW;
+    gradC *= s2JxW;
     return fe.dNdX.multiply(gradC,R,false,true); // R -= dNdX*gradC*s2JxW
   }
   else
@@ -320,7 +320,7 @@ bool CahnHilliardNorm::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
       k ++;
 
     // Dissipated energy, eps_d
-    pnorm[k++] += Gc*(pow(C-1.0,2.0)/(4.0*l0) + l0*gradC.dot(gradC))*fe.detJxW;
+    pnorm[k++] += Gc*(C*C/(2*l0)+ l0/2*gradC.dot(gradC))*fe.detJxW;
 
     if (aSol && i == 0)
     {

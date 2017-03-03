@@ -207,6 +207,8 @@ public:
   //! \param[in] tp Time stepping parameters
   SIM::ConvStatus solveIteration(TimeStep& tp)
   {
+//    if (tp.step > 1)
+//      return SIM::CONVERGED;
     TimeStep myTp(tp); // Make a copy to avoid destroying the iteration counter
     dSim.setSubIteration(tp.iter == 0 ? DynSIM::FIRST : DynSIM::ITER);
     return dSim.solveStep(myTp);
