@@ -127,6 +127,10 @@ public:
       if (!this->writeGlvN(eNorm,vtfStep,nBlock,pfxs,210))
         return false;
 
+      this->setMode(SIM::INT_FORCES);
+      if (!this->assembleSystem(tp.time,phasefield,false))
+        return false;
+
       if (!this->writeGlvStep(vtfStep,tp.time.t))
         return false;
     }
@@ -398,13 +402,15 @@ protected:
     return true;
   }
 
+public:
+  int     vtfStep = 0;    //!< VTF file step counter
+
 private:
   Vectors phasefield; //!< Current (and previous) phase field solution
   Matrix  projSol;    //!< Projected solution fields
   Matrix  eNorm;      //!< Element norm values
   Vector  norm;       //!< Global norm values
   double  eps_d0;     //!< Initial eps_d value, subtracted from following values
-  int     vtfStep;    //!< VTF file step counter
   int     Lnorm;      //!< Which L-norm to use to guide mesh refinement
   int     irefine;    //!< Number of initial refinement cycles
   double  refTol;     //!< Initial refinement threshold

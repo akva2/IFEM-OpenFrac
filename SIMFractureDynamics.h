@@ -65,6 +65,7 @@ public:
   //! \details It also writes global energy quantities to file for plotting.
   virtual bool saveStep(const TimeStep& tp, int& nBlock)
   {
+    nLocBlock = &nBlock;
     if (!energFile.empty() && tp.step > 0 &&
         this->S1.getProcessAdm().getProcId() == 0)
     {
@@ -242,6 +243,7 @@ public:
 #endif
   }
 
+  int*   nLocBlock;
 private:
   std::string energFile; //!< File name for global energy output
   std::string infile;    //!< Input file parsed
@@ -340,6 +342,11 @@ public:
       return SIM::FAILURE;
 
     if (!this->S2.extractLoadVec(residual))
+      return SIM::FAILURE;
+
+    std::cout << "max res " << residual.normInf() << std::endl;
+    this->S2.writeGlvV(residual,"phase residual", ++this->S2.vtfStep, *this->nLocBlock, 110, 1);
+    if (!this->S2.writeGlvStep(this->S2.vtfStep,tp.time.t))
       return SIM::FAILURE;
 
     double rNorm2 = residual.norm2();
