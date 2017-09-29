@@ -39,7 +39,7 @@ class SIMFracture : public Coupling<SolidSolver,PhaseSolver>
 public:
   //! \brief The constructor initializes the references to the two solvers.
   SIMFracture(SolidSolver& s1, PhaseSolver& s2, const std::string& inputfile)
-    : CoupledSIM(s1,s2), infile(inputfile), aMin(0.0) {}
+    : CoupledSIM(s1,s2), infile(inputfile), aMin{0.0} {}
   //! \brief Empty destructor.
   virtual ~SIMFracture() {}
 
@@ -148,14 +148,17 @@ public:
   int adaptMesh(double beta, double min_frac, int nrefinements)
   {
 #ifdef HAS_LRSPLINE
-    // TODO: Add multi-patch support
     ASMu2D* pch = dynamic_cast<ASMu2D*>(this->S1.getPatch(1));
     if (!pch) return -999; // Logic error, should not happen
 
-    if (aMin <= 0.0) // maximum refinements per element
+    if (aMin.front() <= 0.0) // maximum refinements per element
     {
       double redMax = pow(2.0,nrefinements);
-      aMin = pch->getBasis()->getElement(0)->area()/(redMax*redMax);
+      aMin.resize(this->S1.getNoPatches());
+      for (int i = 0; i < this->S1.getNoPatches(); ++i) {
+        pch = dynamic_cast<ASMu2D*>(this->S1.getPatch(i+1));
+        aMin[i] = pch->getBasis()->getElement(0)->area()/(redMax*redMax);
+      }
     }
 
     // Fetch element norms to use as refinement criteria
@@ -181,23 +184,29 @@ public:
                <<"\n  Highest element:"<< std::setw(8) << idx.back()
                <<"    |c| = "<< eNorm[idx.back()]
                <<"\n  Minimum |c|-value for refinement: "<< eMin
-               <<"\n  Minimum element area: "<< aMin << std::endl;
+               <<"\n  Minimum element area:";
+    for (double amin : aMin)
+      IFEM::cout << " " << amin;
+    IFEM::cout << std::endl;
 
     IntVec elements; // Find the elements to refine
     elements.reserve(eMax);
     for (int eid : idx)
       if (eNorm[eid] > eMin || elements.size() >= eMax)
         break;
-      else
+      else {
+        size_t p = 0;
         for (const ASMbase* patch : this->S1.getFEModel()) {
           int el;
+          ++p;
           if ((el = patch->getElmIndex(eid+1))) {
             const ASMu2D* pch = dynamic_cast<const ASMu2D*>(patch);
-            if (pch->getBasis()->getElement(el-1)->area() > aMin+1.0e-12)
+            if (pch->getBasis()->getElement(el-1)->area() > aMin[p-1]+1.0e-12)
               elements.push_back(eid);
             break;
           }
         }
+      }
 
     if (elements.empty())
       return 0;
@@ -224,15 +233,24 @@ public:
         if ((el = patch->getElmIndex(elem+1))) {
           const ASMu2D* pch = dynamic_cast<const ASMu2D*>(patch);
           for (const LR::Basisfunction* b : pch->getBasis()->getElement(el-1)->support())
-            prm.elements.push_back(b->getId());
+            prm.elements.push_back(pch->getNodeID(b->getId()+1)-1);
           break;
         }
       }
     }
-    
+
     size_t solsize = sols.size();
+    size_t sollen = sols.front().size();
     if (!this->S1.refine(prm,sols) || !this->S2.refine(prm))
       return -2;
+
+    static int level=0;
+    std::stringstream str;
+    str << "hmm-" << ++level << ".lr";
+    std::ofstream of(str.str());
+    for (auto& it : this->S1.getFEModel())
+      of << *dynamic_cast<ASMu2D*>(it)->getBasis(1);
+    of.close();
 
     // Re-initialize the simulators for the new mesh
     this->S1.clearProperties();
@@ -253,21 +271,20 @@ public:
     // Transfer solution variables onto the new mesh
     if (!sols.empty())
     {
-      IFEM::cout <<"\nTransferring "<< sols.size()-1 <<"x"<< sols.front().size()
+      IFEM::cout <<"\nTransferring "<< solsize-1 <<"x"<< sollen
                  <<" solution variables to new mesh for "<< this->S1.getName();
-      Vectors soli(this->S1.getNoSolutions(), Vector(this->S1.getNoNodes(1)));
-      size_t ofs = 0;
+      Vectors soli(solsize-1, Vector(this->S1.getNoDOFs()));
       for (size_t i = 0; i < solsize-1; ++i) {
-        for (int p = 0; p < this->S1.getNoPatches(); ++p, ++ofs)
-          this->S1.injectPatchSolution(soli[i], sols[ofs], p+1);
+        for (int p = 0; p < this->S1.getNoPatches(); ++p)
+          this->S1.injectPatchSolution(soli[i], sols[p*solsize+i], p);
       }
       this->S1.setSolutions(soli);
-      IFEM::cout <<"\nTransferring "<< sols.back().size()
+      IFEM::cout <<"\nTransferring "<< sollen 
                  <<" solution variables to new mesh for "<< this->S2.getName();
-      soli.resize(1);
-      for (int p = 0; p < this->S1.getNoPatches(); ++p, ++ofs)
-        this->S2.injectPatchSolution(soli.front(), sols[ofs], p+1);
-      this->S2.setSolution(soli.front());
+      Vector solc(this->S2.getNoDOFs());
+      for (int p = 0; p < this->S1.getNoPatches(); ++p)
+        this->S2.injectPatchSolution(solc, sols[p*solsize+solsize-1], p);
+      this->S2.setSolution(solc);
     }
     if (!hsol.empty())
     {
@@ -290,7 +307,7 @@ private:
   std::string energFile; //!< File name for global energy output
   std::string infile;    //!< Input file parsed
 
-  double    aMin; //!< Minimum element area
+  RealArray aMin; //!< Minimum element area
   Vectors   sols; //!< Solution state to transfer onto refined mesh
   RealArray hsol; //!< History field to transfer onto refined mesh
 };

@@ -26,6 +26,11 @@
 #include "DataExporter.h"
 #include "IFEM.h"
 #include "tinyxml.h"
+#ifdef HAS_CEREAL
+#include <cereal/cereal.hpp>
+#include <cereal/archives/binary.hpp>
+#include <cereal/types/vector.hpp>
+#endif
 
 
 /*!
@@ -368,13 +373,46 @@ public:
       else
         result &= pch->transferCntrlPtVars(oldBasis[idx],oldHp,newHp,Dim::opt.nGauss[0]);
       ofs_old += nPtPatch;
-      std::copy(newHp.begin(), newH.end(), newH.begin()+ofs_new);
+      std::copy(newHp.begin(), newHp.end(), newH.begin()+ofs_new);
       ofs_new += newHp.size();
     }
 
     return result;
   }
 #endif
+
+  //! \brief Serialize internal state for restarting purposes.
+  //! \param data Container for serialized data
+  bool serialize(DataExporter::SerializeData& data)
+  {
+#ifdef HAS_CEREAL
+    std::ostringstream str;
+    cereal::BinaryOutputArchive ar(str);
+    doSerializeOps(ar);
+    data.insert(std::make_pair(this->getName(), str.str()));
+    return true;
+#else
+    return false;
+#endif
+  }
+
+  //! \brief Set internal state from a serialized state.
+  //! \param[in] data Container for serialized data
+  bool deSerialize(const DataExporter::SerializeData& data)
+  {
+#ifdef HAS_CEREAL
+    std::stringstream str;
+    auto it = data.find(this->getName());
+    if (it != data.end()) {
+      str << it->second;
+      cereal::BinaryInputArchive ar(str);
+      doSerializeOps(ar);
+      return true;
+    }
+#endif
+    return false;
+  }
+
 
 protected:
   using Dim::parse;
@@ -454,6 +492,15 @@ protected:
 
     return true;
   }
+
+   //! \brief Serialize to/from state.
+   //! \param ar An input or ouput archive
+   template <class T> void doSerializeOps(T& ar)
+   {
+     for (size_t i = 0; i < phasefield.size(); ++i)
+       ar(phasefield[i]);
+     ar(static_cast<CahnHilliard*>(this->myProblem)->historyField);
+   }
 
 private:
   Vectors phasefield; //!< Current (and previous) phase field solution
