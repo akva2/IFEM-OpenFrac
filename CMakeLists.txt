@@ -44,7 +44,7 @@ add_executable(CahnHilliard main_CahnHilliard.C)
 add_executable(FractureDynamics main_FractureDynamics.C)
 
 target_link_libraries(CahnHilliard CommonFrac Elasticity ${IFEM_LIBRARIES})
-target_link_libraries(FractureDynamics CommonFrac Elasticity ${IFEM_LIBRARIES})
+target_link_libraries(FractureDynamics CommonFrac Elasticity ${IFEM_LIBRARIES} IFEMAppCommon)
 
 list(APPEND CHECK_SOURCES main_CahnHilliard.C main_FractureDynamics.C ${FracEl_SRCS})
 

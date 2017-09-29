@@ -188,8 +188,16 @@ public:
     for (int eid : idx)
       if (eNorm[eid] > eMin || elements.size() >= eMax)
         break;
-      else if (pch->getBasis()->getElement(eid)->area() > aMin+1.0e-12)
-        elements.push_back(eid);
+      else
+        for (const ASMbase* patch : this->S1.getFEModel()) {
+          int el;
+          if ((el = patch->getElmIndex(eid+1))) {
+            const ASMu2D* pch = dynamic_cast<const ASMu2D*>(patch);
+            if (pch->getBasis()->getElement(el-1)->area() > aMin+1.0e-12)
+              elements.push_back(eid);
+            break;
+          }
+        }
 
     if (elements.empty())
       return 0;
@@ -198,13 +206,31 @@ public:
                <<" (|c| = ["<< eNorm[elements.front()]
                <<","<< eNorm[elements.back()] <<"])\n"<< std::endl;
 
-    LR::LRSplineSurface* oldBasis = nullptr;
-    if (!hsol.empty()) oldBasis = pch->getBasis()->copy();
+    std::vector<LR::LRSplineSurface*> oldBasis;
+    if (!hsol.empty())
+      for (ASMbase* patch : this->S1.getFEModel()) {
+        ASMu2D* pch = dynamic_cast<ASMu2D*>(patch);
+        oldBasis.push_back(pch->getBasis()->copy());
+      }
 
     // Do the mesh refinement
     LR::RefineData prm;
     prm.options = { 10, 1, 2, 0, 1 };
-    prm.elements = pch->getFunctionsForElements(elements);
+
+    // Translate from element IDs to function IDs
+    for (int elem : elements) {
+      for (const ASMbase* patch : this->S1.getFEModel()) {
+        int el;
+        if ((el = patch->getElmIndex(elem+1))) {
+          const ASMu2D* pch = dynamic_cast<const ASMu2D*>(patch);
+          for (const LR::Basisfunction* b : pch->getBasis()->getElement(el-1)->support())
+            prm.elements.push_back(b->getId());
+          break;
+        }
+      }
+    }
+    
+    size_t solsize = sols.size();
     if (!this->S1.refine(prm,sols) || !this->S2.refine(prm))
       return -2;
 
@@ -229,10 +255,19 @@ public:
     {
       IFEM::cout <<"\nTransferring "<< sols.size()-1 <<"x"<< sols.front().size()
                  <<" solution variables to new mesh for "<< this->S1.getName();
-      this->S1.setSolutions(sols);
+      Vectors soli(this->S1.getNoSolutions(), Vector(this->S1.getNoNodes(1)));
+      size_t ofs = 0;
+      for (size_t i = 0; i < solsize-1; ++i) {
+        for (int p = 0; p < this->S1.getNoPatches(); ++p, ++ofs)
+          this->S1.injectPatchSolution(soli[i], sols[ofs], p+1);
+      }
+      this->S1.setSolutions(soli);
       IFEM::cout <<"\nTransferring "<< sols.back().size()
                  <<" solution variables to new mesh for "<< this->S2.getName();
-      this->S2.setSolution(sols.back());
+      soli.resize(1);
+      for (int p = 0; p < this->S1.getNoPatches(); ++p, ++ofs)
+        this->S2.injectPatchSolution(soli.front(), sols[ofs], p+1);
+      this->S2.setSolution(soli.front());
     }
     if (!hsol.empty())
     {
@@ -240,7 +275,8 @@ public:
                  <<" history variables to new mesh for "<< this->S2.getName()
                  << std::endl;
       this->S2.transferHistory2D(hsol,oldBasis);
-      delete oldBasis;
+      for (LR::LRSplineSurface* srf : oldBasis)
+        delete srf;
     }
 
     return elements.size();

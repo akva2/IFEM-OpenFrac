@@ -90,7 +90,7 @@ void CahnHilliard::printLog () const
 void CahnHilliard::setMode (SIM::SolutionMode mode)
 {
   m_mode = mode;
-  primsol.resize(mode < SIM::RHS_ONLY && gammaInv == 0.0 ? 0 : 2);
+  primsol.resize(mode < SIM::RHS_ONLY && gammaInv == 0.0 ? 0 : 1);
 }
 
 
