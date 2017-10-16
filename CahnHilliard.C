@@ -90,7 +90,7 @@ void CahnHilliard::printLog () const
 void CahnHilliard::setMode (SIM::SolutionMode mode)
 {
   m_mode = mode;
-  primsol.resize(mode < SIM::RHS_ONLY && gammaInv == 0.0 ? 0 : 2);
+  primsol.resize(mode < SIM::RHS_ONLY && gammaInv == 0.0 ? 0 : 1);
 }
 
 
@@ -219,7 +219,10 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
   std::cout <<"\nCahnHilliard::evalInt(X = "<< X <<"): C = "<< C << std::endl;
 #endif
 
+//  std::cout << "hmm " << H/GcOell << std::endl;
   double scale = 1.0 + 2.0*(1.0-stabk)*H/GcOell;
+  if (H < 0)
+    std::cout << "alarm!" << std::endl;
   if (inCrack)
     scale += gammaInv/GcOell;
   double s1JxW = scale*fe.detJxW;
@@ -246,10 +249,10 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
 
     // Evaluate the current phase field, and ensure it is within the [0,1] range
     C = fe.N.dot(elmInt.vec.front());
-    if (C < 0.0)
-      C = 0.0;
-    else if (C > 1.0)
-      C = 1.0;
+//    if (C < 0.0)
+//      C = 0.0;
+//    else if (C > 1.0)
+//      C = 1.0;
 
     Vector gradC; // Compute the phase field gradient gradC = dNdX^t*eC
     if (!fe.dNdX.multiply(elmInt.vec.front(),gradC,true))
@@ -271,13 +274,13 @@ bool CahnHilliard::evalInt (LocalIntegral& elmInt, const FiniteElement& fe,
     // Apply scaling Gc/ell compared to the STATIC mode, such that
     // the resulting residual force vector has comparable dimension
     // as the residual forces of the elasticity equation.
-    s1JxW  = GcOell*(1.0 - C*scale)*fe.detJxW;
+    s1JxW  =  GcOell*(1.0 - C*scale)*fe.detJxW;
     s2JxW *= GcOell;
 
     R.add(fe.N,s1JxW); // R += N*s1JxW
 
     gradC *= -s2JxW;
-    return fe.dNdX.multiply(gradC,R,false,true); // R -= dNdX*gradC*s2JxW
+    return fe.dNdX.multiply(gradC,R,false,1); // R -= dNdX*gradC*s2JxW
   }
   else
   {

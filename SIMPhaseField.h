@@ -367,6 +367,7 @@ public:
         result &= pch->transferGaussPtVars(oldBasis[idx],oldHp,newHp,Dim::opt.nGauss[0]);
       else
         result &= pch->transferCntrlPtVars(oldBasis[idx],oldHp,newHp,Dim::opt.nGauss[0]);
+
       ofs_old += nPtPatch;
       std::copy(newHp.begin(), newHp.end(), newH.begin()+ofs_new);
       ofs_new += newHp.size();
