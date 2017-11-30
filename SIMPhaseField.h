@@ -17,7 +17,9 @@
 #include "CahnHilliard.h"
 #ifdef HAS_LRSPLINE
 #include "ASMu2D.h"
-#include <LRSpline/LRSplineSurface.h>
+#include "ASMu3D.h"
+#include "LRSpline/LRSplineSurface.h"
+#include "LRSpline/LRSplineVolume.h"
 #else
 namespace LR { class LRSpline; }
 #endif
@@ -361,9 +363,12 @@ public:
   {
 #ifdef HAS_LRSPLINE
     ASMu2D* pch2;
+    ASMu3D* pch3;
     for (ASMbase* patch : Dim::myModel)
       if ((pch2 = dynamic_cast<ASMu2D*>(patch)))
         basis.push_back(pch2->getBasis()->copy());
+      else if ((pch3 = dynamic_cast<ASMu3D*>(patch)))
+        basis.push_back(pch3->getBasis()->copy());
 #endif
   }
 
@@ -384,10 +389,10 @@ public:
     RealArray newHp, oldHn;
     for (LR::LRSpline* basis : oldBasis)
     {
-      const ASMu2D* pch = dynamic_cast<ASMu2D*>(this->getPatch(++idx));
+      const ASMunstruct* pch = dynamic_cast<ASMunstruct*>(this->getPatch(++idx));
       if (pch && (size_t)idx <= oldBasis.size())
       {
-        LR::LRSplineSurface* surf = dynamic_cast<LR::LRSplineSurface*>(basis);
+        LR::LRSpline* surf = dynamic_cast<LR::LRSpline*>(basis);
         switch (transferOp) {
         case 'P':
           oldHn.resize(pch->getNoNodes());
@@ -396,12 +401,12 @@ public:
           ok &= pch->transferCntrlPtVars(surf,oldHn,newHp,nGp);
           break;
         case 'N':
-          jtH = itH + basis->nElements()*nGp*nGp;
+          jtH = itH + basis->nElements()*pow(nGp, this->Dim::dimension);
           ok &= pch->transferGaussPtVarsN(surf,RealArray(itH,jtH),newHp,nGp);
           itH = jtH;
           break;
         default:
-          jtH = itH + basis->nElements()*nGp*nGp;
+          jtH = itH + basis->nElements()*pow(nGp,this->Dim::dimension);
           ok &= pch->transferGaussPtVars(surf,RealArray(itH,jtH),newHp,nGp);
           itH = jtH;
         }
