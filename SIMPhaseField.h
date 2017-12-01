@@ -495,7 +495,7 @@ protected:
 
     // Perform initial refinement around the crack
     RealFunc* refC = static_cast<CahnHilliard*>(Dim::myProblem)->initCrack();
-    ASMu2D* patch1 = dynamic_cast<ASMu2D*>(this->getPatch(1));
+    ASMunstruct* patch1 = dynamic_cast<ASMunstruct*>(this->getPatch(1));
     if (refC && patch1 && this->getNoPatches() == 1)
       for (int i = 0; i < irefine; i++, refTol *= 0.5)
         if (!patch1->refine(*refC,refTol))
