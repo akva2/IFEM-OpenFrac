@@ -286,6 +286,10 @@ public:
     return fel ? fel->getCrackPressure() : nullptr;
   }
 
+  //! \brief Public accessor for additional MADOFs.
+  const std::vector<int>& getMA(unsigned char basis, unsigned char nndof) const
+  { return this->getMADOF(basis, nndof); }
+
 protected:
   //! \brief Returns the actual integrand.
   virtual Elasticity* getIntegrand()
@@ -332,6 +336,15 @@ protected:
       result = this->Dim::parse(elem);
     --ncall;
     return result;
+  }
+
+  //! \brief Adds an additional MADOF if required.
+  bool preprocessB() override
+  {
+    if (this->getNoBasis() != 1)
+      return this->addMADOF(1, 1, false);
+
+    return true;
   }
 
 private:

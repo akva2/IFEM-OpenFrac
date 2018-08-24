@@ -61,7 +61,11 @@ public:
   //! \brief Initializes and sets up field dependencies.
   virtual void setupDependencies()
   {
-    this->S1.registerDependency(&this->S2,"phasefield",1);
+    if (this->S2.getHeading() == "Explicit phase field" && this->S1.getNoBasis() != 1)
+    this->S1.registerDependency(&this->S2,"phasefield",1, this->S1.getFEModel(),1,
+                               this->S1.getMA(1,1));
+    else
+      this->S1.registerDependency(&this->S2,"phasefield",1);
     // The tensile energy is defined on integration points and not nodal points.
     // It is a global buffer array across all patches in the model.
     // Use an explicit call instead of normal couplings for this.
