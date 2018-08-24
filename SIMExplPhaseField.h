@@ -91,6 +91,9 @@ public:
   bool transferHistory(const RealArray&,
                        std::vector<LR::LRSpline*>&) { return true; }
 
+  //! \brief Returns \e true if terminating due to user-defined criteria.
+  bool checkStopCriterion () const { return false; }
+
 protected:
   using SIMbase::parse;
   //! \brief Parses a data section from an XML element.
