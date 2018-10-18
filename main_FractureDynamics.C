@@ -118,6 +118,9 @@ int runCombined (char* infile, double stopTime, const char* context)
   IFEM::cout <<"\n\n10. Preprocessing the finite element model:"
              <<"\n==========================================="<< std::endl;
 
+  if (phaseSim.getInitRefine() > 0)
+    elastoSim.clearNodeNumbers();
+
   // Preprocess the model and establish data structures for the algebraic system
   if (!frac.preprocess())
     return 2;

@@ -291,6 +291,8 @@ public:
     return fel ? fel->getCrackPressure() : nullptr;
   }
 
+  void clearNodeNumbers() { this->getPatch(1)->setGlobalNodeNums(IntVec()); }
+
 protected:
   //! \brief Returns the actual integrand.
   Elasticity* getIntegrand() override
