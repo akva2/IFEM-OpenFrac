@@ -17,7 +17,10 @@
 #include "ASMunstruct.h"
 #include "ProcessAdm.h"
 #include "Functions.h"
+#include "IFEM.h"
 #include "Profiler.h"
+#include "SIMenums.h"
+#include "TimeStep.h"
 #include <fstream>
 #include <numeric>
 
@@ -418,25 +421,27 @@ protected:
     if (!this->S1.assembleSystem(tp.time,this->S1.getSolutions(),false))
       return -1.0;
 
-    if (!this->S1.extractLoadVec(residual))
+    Vector residual2;
+    if (!this->S1.extractLoadVec(residual2))
       return -1.0;
 
-    double rNorm1 = residual.norm2();
+    double rNorm1 = residual2.norm2();
     double eNorm1 = this->S1.extractScalar();
 
     // Compute residual of the phase-field equation
     if (!this->S2.setMode(SIM::INT_FORCES))
       return -2.0;
 
-    Vectors sol2(1,this->S2.getSolution());
-    if (!this->S2.assembleSystem(tp.time,sol2,false))
-      return -2.0;
+    residual -= this->S2.getSolution();
+//    if (!this->S2.assembleSystem(tp.time,sol2,false))
+//      return -2.0;
 
-    if (!this->S2.extractLoadVec(residual))
-      return -2.0;
+//    if (!this->S2.extractLoadVec(residual))
+//      return -2.0;
 
     double rNorm2 = residual.norm2();
     double eNorm2 = this->S2.extractScalar();
+    residual = this->S2.getSolution();
 
     double rConv = rNorm1 + rNorm2;
     double eConv = eNorm1 + eNorm2;
