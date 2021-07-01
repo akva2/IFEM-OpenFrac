@@ -24,6 +24,21 @@
 
 
 /*!
+  \brief Linear quasi-static solution driver.
+*/
+
+class LinSIM : public NonLinSIM
+{
+public:
+  //! \brief The constructor forwards to the parent class constructor.
+  explicit LinSIM(SIMbase& sim) : NonLinSIM(sim,NonLinSIM::NONE) {}
+  //! \brief Empty destructor.
+  virtual ~LinSIM() {}
+};
+
+
+
+/*!
   \brief Driver class for dynamic elasticity problems with fracture.
 */
 
